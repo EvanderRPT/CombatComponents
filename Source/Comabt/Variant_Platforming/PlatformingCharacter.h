@@ -8,6 +8,7 @@
 #include "PlatformingCharacter.generated.h"
 
 
+class UStaminaComponent;
 class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
@@ -57,6 +58,10 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* DashAction;
 
+	UPROPERTY(BlueprintReadWrite, Category="Input")
+	UStaminaComponent* StaminaComponent;
+	
+	
 public:
 
 	/** Constructor */

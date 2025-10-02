@@ -11,6 +11,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "EnhancedInputComponent.h"
 #include "TimerManager.h"
+#include "Component/StaminaComponent.h"
 #include "Engine/LocalPlayer.h"
 
 APlatformingCharacter::APlatformingCharacter()
@@ -75,6 +76,9 @@ APlatformingCharacter::APlatformingCharacter()
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
+
+	StaminaComponent = CreateDefaultSubobject<UStaminaComponent>(TEXT("StaminaComponent"));
+	
 }
 
 void APlatformingCharacter::Move(const FInputActionValue& Value)
@@ -125,53 +129,66 @@ void APlatformingCharacter::MultiJump()
 
 			if (GetWorld()->SweepSingleByChannel(OutHit, TraceStart, TraceEnd, FQuat(), ECollisionChannel::ECC_Visibility, TraceShape, QueryParams))
 			{
-				// rotate the character to face away from the wall, so we're correctly oriented for the next wall jump
-				FRotator WallOrientation = OutHit.ImpactNormal.ToOrientationRotator();
-				WallOrientation.Pitch = 0.0f;
-				WallOrientation.Roll = 0.0f;
+			
+					// rotate the character to face away from the wall, so we're correctly oriented for the next wall jump
+					FRotator WallOrientation = OutHit.ImpactNormal.ToOrientationRotator();
+					WallOrientation.Pitch = 0.0f;
+					WallOrientation.Roll = 0.0f;
 
-				SetActorRotation(WallOrientation);
+				
+					SetActorRotation(WallOrientation);
+				
 
-				// apply a launch impulse to the character to perform the actual wall jump
-				const FVector WallJumpImpulse = (OutHit.ImpactNormal * WallJumpBounceImpulse) + (FVector::UpVector * WallJumpVerticalImpulse);
+					// apply a launch impulse to the character to perform the actual wall jump
+					const FVector WallJumpImpulse = (OutHit.ImpactNormal * WallJumpBounceImpulse) + (FVector::UpVector * WallJumpVerticalImpulse);
 
-				LaunchCharacter(WallJumpImpulse, true, true);
-
-				// enable the jump trail
-				SetJumpTrailState(true);
-
-				// raise the wall jump flag to prevent an immediate second wall jump
-				bHasWallJumped = true;
-
-				GetWorld()->GetTimerManager().SetTimer(WallJumpTimer, this, &APlatformingCharacter::ResetWallJump, DelayBetweenWallJumps, false);
-			}
-			// no wall jump, try a double jump next
-			else
-			{
-				// are we still within coyote time frames?
-				if (GetWorld()->GetTimeSeconds() - LastFallTime < MaxCoyoteTime)
-				{
-					UE_LOG(LogTemp, Warning, TEXT("Coyote Jump"));
-
-					// use the built-in CMC functionality to do the jump
-					Jump();
+					LaunchCharacter(WallJumpImpulse, true, true);
 
 					// enable the jump trail
 					SetJumpTrailState(true);
 
-				// no coyote time jump
+					// raise the wall jump flag to prevent an immediate second wall jump
+					bHasWallJumped = true;
+
+					GetWorld()->GetTimerManager().SetTimer(WallJumpTimer, this, &APlatformingCharacter::ResetWallJump, DelayBetweenWallJumps, false);
+				
+			}
+			// no wall jump, try a double jump next
+			else
+			{
+				
+					// are we still within coyote time frames?
+					if (GetWorld()->GetTimeSeconds() - LastFallTime < MaxCoyoteTime)
+					{
+						UE_LOG(LogTemp, Warning, TEXT("Coyote Jump"));
+
+						if (StaminaComponent->ConsumeStamina(10.f))
+						// use the built-in CMC functionality to do the jump
+						{
+							Jump();
+
+							// enable the jump trail
+							SetJumpTrailState(true);
+						}
+						// no coyote time jump
+				
 				} else {
 
 					// only double jump once while we're in the air
 					if (!bHasDoubleJumped)
 					{
-						bHasDoubleJumped = true;
+						
+							bHasDoubleJumped = true;
 
-						// use the built-in CMC functionality to do the double jump
-						Jump();
+							// use the built-in CMC functionality to do the double jump
+						if (StaminaComponent->ConsumeStamina(10.f))
+						{
+							Jump();
 
-						// enable the jump trail
-						SetJumpTrailState(true);
+							// enable the jump trail
+							SetJumpTrailState(true);
+						}
+						
 					}
 
 				}
@@ -236,7 +253,7 @@ void APlatformingCharacter::DoDash()
 	// ignore the input if we've already dashed and have yet to reset
 	if (bHasDashed)
 		return;
-
+	if (!StaminaComponent->ConsumeStamina(10.f)) return;
 	// raise the dash flags
 	bIsDashing = true;
 	bHasDashed = true;
